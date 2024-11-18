@@ -934,6 +934,138 @@ class ConfusionMatrixMetricsTest(
       metric.computations(
           sub_keys=[metric_types.SubKey(class_id=class_id, top_k=top_k)])
 
+
+  # LINT.IfChange(tfma_confusion_matrix_metrics_tests)
+  @parameterized.named_parameters(
+      (
+          'binary_accuracy_at_thresholds',
+          confusion_matrix_metrics.BinaryAccuracy(thresholds=[0.25, 0.5]),
+          np.array([
+            (3.0 + 1.0) / (3.0 + 1.0 + 4.0 + 2.0),
+            (1.0 + 2.0) / (1.0 + 2.0 + 3.0 + 4.0),
+          ])
+      ),
+      (
+          'precision_at_thresholds',
+          confusion_matrix_metrics.Precision(thresholds=[0.25, 0.5]),
+          np.array([
+            3.0 / (3.0 + 4.0),
+            1.0 / (1.0 + 3.0),
+          ])
+      ),
+  )
+  def testConfusionMatrixMetricsAtThresholds(self, metric, expected_values):
+    computations = metric.computations(example_weighted=True)
+    histogram = computations[0]
+    matrices = computations[1]
+    metrics = computations[2]
+    # # Threshold = 0.25
+    # tp = 3
+    # tn = 1
+    # fp = 4
+    # fn = 2
+
+    # # Threshold = 0.5
+    # tp = 1
+    # tn = 2
+    # fp = 3
+    # fn = 4
+    example1 = {
+        'labels': np.array([1.0]),
+        'predictions': np.array([0.6]),
+        'example_weights': np.array([1.0]),
+    }
+    example2 = {
+        'labels': np.array([0.0]),
+        'predictions': np.array([0.3]),
+        'example_weights': np.array([1.0]),
+    }
+    example3 = {
+        'labels': np.array([0.0]),
+        'predictions': np.array([0.2]),
+        'example_weights': np.array([1.0]),
+    }
+    example4 = {
+        'labels': np.array([0.0]),
+        'predictions': np.array([0.6]),
+        'example_weights': np.array([1.0]),
+    }
+    example5 = {
+        'labels': np.array([0.0]),
+        'predictions': np.array([0.7]),
+        'example_weights': np.array([1.0]),
+    }
+    example6 = {
+        'labels': np.array([0.0]),
+        'predictions': np.array([0.8]),
+        'example_weights': np.array([1.0]),
+    }
+    example7 = {
+        'labels': np.array([1.0]),
+        'predictions': np.array([0.1]),
+        'example_weights': np.array([1.0]),
+    }
+    example8 = {
+        'labels': np.array([1.0]),
+        'predictions': np.array([0.2]),
+        'example_weights': np.array([1.0]),
+    }
+    example9 = {
+        'labels': np.array([1.0]),
+        'predictions': np.array([0.3]),
+        'example_weights': np.array([1.0]),
+    }
+    example10 = {
+        'labels': np.array([1.0]),
+        'predictions': np.array([0.4]),
+        'example_weights': np.array([1.0]),
+    }
+
+    with beam.Pipeline() as pipeline:
+      # pylint: disable=no-value-for-parameter
+      result = (
+          pipeline
+          | 'Create'
+          >> beam.Create([
+              example1,
+              example2,
+              example3,
+              example4,
+              example5,
+              example6,
+              example7,
+              example8,
+              example9,
+              example10,
+          ])
+          | 'Process' >> beam.Map(metric_util.to_standard_metric_inputs)
+          | 'AddSlice' >> beam.Map(lambda x: ((), x))
+          | 'ComputeHistogram' >> beam.CombinePerKey(histogram.combiner)
+          | 'ComputeMatrices'
+          >> beam.Map(lambda x: (x[0], matrices.result(x[1])))
+          | 'ComputeMetrics' >> beam.Map(lambda x: (x[0], metrics.result(x[1])))
+      )
+
+      # pylint: enable=no-value-for-parameter
+
+      def check_result(got):
+        try:
+          self.assertLen(got, 1)
+          got_slice_key, got_metrics = got[0]
+          self.assertEqual(got_slice_key, ())
+          self.assertLen(got_metrics, 1)
+          key = metrics.keys[0]
+          self.assertIn(key, got_metrics)
+          # np.testing utils automatically cast floats to arrays which fails
+          # to catch type mismatches.
+          self.assertEqual(type(expected_values), type(got_metrics[key]))
+          np.testing.assert_almost_equal(
+              got_metrics[key], expected_values, decimal=5)
+        except AssertionError as err:
+          raise util.BeamAssertException(err)
+
+      util.assert_that(result, check_result, label='result')
+
   def testConfusionMatrixAtThresholds(self):
     computations = confusion_matrix_metrics.ConfusionMatrixAtThresholds(
         thresholds=[0.3, 0.5, 0.8]).computations(example_weighted=True)

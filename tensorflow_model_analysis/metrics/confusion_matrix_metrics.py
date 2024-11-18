@@ -1281,18 +1281,18 @@ class BinaryAccuracy(ConfusionMatrixMetric):
   """
 
   def __init__(self,
-               threshold: Optional[float] = None,
+               thresholds: Optional[Union[float, List[float]]] = None,
                top_k: Optional[int] = None,
                class_id: Optional[int] = None,
                name: Optional[str] = None):
     """Initializes BinaryAccuracy metric.
 
     Args:
-      threshold: (Optional) A float value in [0, 1]. The threshold is compared
+      thresholds: (Optional) Defaults to [0.5]. A float value or a python
+        list/tuple of float threshold values in [0, 1]. A threshold is compared
         with prediction values to determine the truth value of predictions
-        (i.e., above the threshold is `true`, below is `false`). If neither
-        threshold nor top_k are set, the default is to calculate with
-        `threshold=0.5`.
+        (i.e., above the threshold is `true`, below is `false`). One metric
+        value is generated for each threshold value.
       top_k: (Optional) Used with a multi-class model to specify that the top-k
         values should be used to compute the confusion matrix. The net effect is
         that the non-top-k values are set to -inf and the matrix is then
@@ -1307,7 +1307,7 @@ class BinaryAccuracy(ConfusionMatrixMetric):
       name: (Optional) string name of the metric instance.
     """
     super().__init__(
-        thresholds=threshold, top_k=top_k, class_id=class_id, name=name)
+        thresholds=thresholds, top_k=top_k, class_id=class_id, name=name)
 
   def _default_name(self) -> str:
     return BINARY_ACCURACY_NAME
